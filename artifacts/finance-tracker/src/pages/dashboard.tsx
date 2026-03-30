@@ -94,7 +94,7 @@ export default function Dashboard() {
                       ))}
                     </Pie>
                     <Tooltip 
-                      formatter={(value: number) => [`$${value.toFixed(2)}`, 'Amount']}
+                      formatter={(value: number) => [`₹${value.toFixed(2)}`, 'Amount']}
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
                     />
                   </PieChart>
@@ -113,7 +113,7 @@ export default function Dashboard() {
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.categoryColor || "var(--muted)" }} />
                     <span className="text-muted-foreground">{cat.categoryName}</span>
                   </div>
-                  <span className="font-medium">${cat.total.toFixed(2)}</span>
+                  <span className="font-medium">₹{cat.total.toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -157,12 +157,12 @@ export default function Dashboard() {
                     <YAxis 
                       axisLine={false} 
                       tickLine={false} 
-                      tickFormatter={(val) => `$${val}`}
+                      tickFormatter={(val) => `₹${val}`}
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                     />
                     <Tooltip 
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
-                      formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
+                      formatter={(value: number) => [`₹${value.toFixed(2)}`, '']}
                       labelFormatter={(label) => {
                         try { return format(parseISO(`${label}-01`), "MMMM yyyy"); } catch { return label; }
                       }}
@@ -214,7 +214,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <span className={`font-medium ${tx.type === 'income' ? 'text-primary' : 'text-foreground'}`}>
-                    {tx.type === 'income' ? '+' : '-'}${tx.amount.toFixed(2)}
+                    {tx.type === 'income' ? '+' : '-'}₹{tx.amount.toFixed(2)}
                   </span>
                 </div>
               ))}
@@ -241,7 +241,7 @@ function StatCard({ title, amount, icon: Icon, trend, subtitle, isLoading }: { t
               <Skeleton className="h-8 w-24" />
             ) : (
               <p className="text-3xl font-serif text-foreground/90 tracking-tight">
-                ${(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹{(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             )}
             {subtitle && !isLoading && (

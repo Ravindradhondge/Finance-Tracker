@@ -119,7 +119,7 @@ export default function Budgets() {
                       <div className="text-right cursor-pointer group" onClick={() => { setEditingId(category.id); setEditAmount(amount ? amount.toString() : ""); }}>
                         {amount > 0 ? (
                           <>
-                            <p className="font-serif text-lg tracking-tight group-hover:text-primary transition-colors">${amount.toFixed(2)}</p>
+                            <p className="font-serif text-lg tracking-tight group-hover:text-primary transition-colors">₹{amount.toFixed(2)}</p>
                             <p className="text-xs text-muted-foreground">Budget</p>
                           </>
                         ) : (
@@ -132,13 +132,13 @@ export default function Budgets() {
                   {amount > 0 && (
                     <div className="space-y-3 mt-6">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">${spent.toFixed(2)} spent</span>
+                        <span className="text-muted-foreground">₹{spent.toFixed(2)} spent</span>
                         {overspent ? (
                           <span className="text-destructive font-medium flex items-center gap-1">
-                            <AlertCircle size={14} /> ${Math.abs(remaining).toFixed(2)} over
+                            <AlertCircle size={14} /> ₹{Math.abs(remaining).toFixed(2)} over
                           </span>
                         ) : (
-                          <span className="text-muted-foreground">${remaining.toFixed(2)} left</span>
+                          <span className="text-muted-foreground">₹{remaining.toFixed(2)} left</span>
                         )}
                       </div>
                       <Progress 

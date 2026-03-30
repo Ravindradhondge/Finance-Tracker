@@ -132,7 +132,7 @@ export default function Transactions() {
                 
                 <div className="flex items-center gap-4 sm:gap-6">
                   <span className={`font-serif text-lg tracking-tight ${tx.type === 'income' ? 'text-primary' : 'text-foreground'}`}>
-                    {tx.type === 'income' ? '+' : '-'}${tx.amount.toFixed(2)}
+                    {tx.type === 'income' ? '+' : '-'}₹{tx.amount.toFixed(2)}
                   </span>
                   
                   <DropdownMenu>
