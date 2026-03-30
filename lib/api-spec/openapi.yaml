@@ -1,15 +1,22 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Personal Finance Tracker API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: transactions
+    description: Transaction operations
+  - name: categories
+    description: Category operations
+  - name: budgets
+    description: Budget operations
+  - name: summary
+    description: Summary and analytics operations
 paths:
   /healthz:
     get:
@@ -24,6 +31,267 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /transactions:
+    get:
+      operationId: getTransactions
+      tags: [transactions]
+      summary: List all transactions
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            description: Filter by month in YYYY-MM format
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [income, expense]
+      responses:
+        "200":
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+    post:
+      operationId: createTransaction
+      tags: [transactions]
+      summary: Create a transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransactionInput"
+      responses:
+        "201":
+          description: Created transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/{id}:
+    get:
+      operationId: getTransaction
+      tags: [transactions]
+      summary: Get a transaction by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateTransaction
+      tags: [transactions]
+      summary: Update a transaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransactionInput"
+      responses:
+        "200":
+          description: Updated transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteTransaction
+      tags: [transactions]
+      summary: Delete a transaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /categories:
+    get:
+      operationId: getCategories
+      tags: [categories]
+      summary: List all categories
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      operationId: createCategory
+      tags: [categories]
+      summary: Create a category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryInput"
+      responses:
+        "201":
+          description: Created category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+
+  /budgets:
+    get:
+      operationId: getBudgets
+      tags: [budgets]
+      summary: List all budgets
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            description: Filter by month in YYYY-MM format
+      responses:
+        "200":
+          description: List of budgets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Budget"
+    post:
+      operationId: createBudget
+      tags: [budgets]
+      summary: Create or update a budget for a category/month
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBudgetInput"
+      responses:
+        "201":
+          description: Created or updated budget
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Budget"
+
+  /summary/monthly:
+    get:
+      operationId: getMonthlySummary
+      tags: [summary]
+      summary: Get monthly income, expense, and savings summary
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            description: Month in YYYY-MM format
+      responses:
+        "200":
+          description: Monthly summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonthlySummary"
+
+  /summary/categories:
+    get:
+      operationId: getCategorySummary
+      tags: [summary]
+      summary: Get spending breakdown by category for a month
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            description: Month in YYYY-MM format
+      responses:
+        "200":
+          description: Category breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategorySummary"
+
+  /summary/trends:
+    get:
+      operationId: getMonthlyTrends
+      tags: [summary]
+      summary: Get last 6 months income/expense trends
+      responses:
+        "200":
+          description: Monthly trends
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MonthlyTrend"
+
+  /summary/recent:
+    get:
+      operationId: getRecentTransactions
+      tags: [summary]
+      summary: Get recent transactions (last 10)
+      responses:
+        "200":
+          description: Recent transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +302,225 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        type:
+          type: string
+          enum: [income, expense]
+        description:
+          type: string
+        date:
+          type: string
+          format: date
+        categoryId:
+          type: integer
+          nullable: true
+        categoryName:
+          type: string
+          nullable: true
+        categoryColor:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - amount
+        - type
+        - description
+        - date
+        - createdAt
+
+    CreateTransactionInput:
+      type: object
+      properties:
+        amount:
+          type: number
+          minimum: 0.01
+        type:
+          type: string
+          enum: [income, expense]
+        description:
+          type: string
+          minLength: 1
+        date:
+          type: string
+          format: date
+        categoryId:
+          type: integer
+          nullable: true
+      required:
+        - amount
+        - type
+        - description
+        - date
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+        icon:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [income, expense, both]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - color
+        - type
+        - createdAt
+
+    CreateCategoryInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        color:
+          type: string
+        icon:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [income, expense, both]
+      required:
+        - name
+        - color
+        - type
+
+    Budget:
+      type: object
+      properties:
+        id:
+          type: integer
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        categoryColor:
+          type: string
+        month:
+          type: string
+          description: YYYY-MM format
+        amount:
+          type: number
+        spent:
+          type: number
+        remaining:
+          type: number
+        percentUsed:
+          type: number
+      required:
+        - id
+        - categoryId
+        - categoryName
+        - categoryColor
+        - month
+        - amount
+        - spent
+        - remaining
+        - percentUsed
+
+    CreateBudgetInput:
+      type: object
+      properties:
+        categoryId:
+          type: integer
+        month:
+          type: string
+          description: YYYY-MM format
+        amount:
+          type: number
+          minimum: 0.01
+      required:
+        - categoryId
+        - month
+        - amount
+
+    MonthlySummary:
+      type: object
+      properties:
+        month:
+          type: string
+        totalIncome:
+          type: number
+        totalExpenses:
+          type: number
+        savings:
+          type: number
+        savingsRate:
+          type: number
+        transactionCount:
+          type: integer
+      required:
+        - month
+        - totalIncome
+        - totalExpenses
+        - savings
+        - savingsRate
+        - transactionCount
+
+    CategorySummary:
+      type: object
+      properties:
+        categoryId:
+          type: integer
+          nullable: true
+        categoryName:
+          type: string
+        categoryColor:
+          type: string
+        total:
+          type: number
+        count:
+          type: integer
+        percentage:
+          type: number
+      required:
+        - categoryName
+        - categoryColor
+        - total
+        - count
+        - percentage
+
+    MonthlyTrend:
+      type: object
+      properties:
+        month:
+          type: string
+        income:
+          type: number
+        expenses:
+          type: number
+        savings:
+          type: number
+      required:
+        - month
+        - income
+        - expenses
+        - savings
