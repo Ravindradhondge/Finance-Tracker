@@ -1,4 +1,5 @@
 import { useMonthContext } from "@/hooks/use-month";
+import { useUser } from "@/hooks/use-user";
 import { 
   useGetMonthlySummary, getGetMonthlySummaryQueryKey, 
   useGetCategorySummary, getGetCategorySummaryQueryKey, 
@@ -13,6 +14,14 @@ import { format, parseISO } from "date-fns";
 
 export default function Dashboard() {
   const { month } = useMonthContext();
+  const { name } = useUser();
+
+  const greeting = (() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  })();
   
   const { data: summary, isLoading: isLoadingSummary } = useGetMonthlySummary(
     { month }, 
@@ -39,6 +48,15 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      {/* Greeting */}
+      {name && (
+        <div>
+          <h2 className="font-serif text-2xl font-medium text-foreground/90 tracking-tight">
+            {greeting}, {name.split(" ")[0]} 👋
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Here's how your finances look this month.</p>
+        </div>
+      )}
       {/* Stats row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard 
