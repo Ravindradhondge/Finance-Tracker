@@ -162,7 +162,7 @@ export default function PhonePeImportDialog({ open, onOpenChange }: Props) {
                       <p className="font-medium text-foreground/80">Drag & drop your PhonePe PDF here</p>
                       <p className="text-sm text-muted-foreground mt-1">or click to browse your files</p>
                     </div>
-                    <span className="text-xs bg-muted text-muted-foreground px-3 py-1 rounded-full">PDF files only · Max 20 MB</span>
+                    <span className="text-xs bg-muted text-muted-foreground px-3 py-1 rounded-full">PDF files only</span>
                   </>
                 )}
               </div>

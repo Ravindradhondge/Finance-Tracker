@@ -8,7 +8,7 @@ const _require = createRequire(import.meta.url);
 const pdfParse: (buffer: Buffer) => Promise<{ text: string }> = _require("pdf-parse");
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage() });
 
 // --- Auto-categorizer ---
 const CATEGORY_RULES: { keywords: string[]; name: string }[] = [
