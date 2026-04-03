@@ -7,7 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import { format, parseISO } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, ArrowDownRight, Plus, MoreHorizontal, Pencil, Trash2, Search } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Plus, MoreHorizontal, Pencil, Trash2, Search, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -16,6 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { TransactionFormDialog } from "@/components/transactions/TransactionFormDialog";
+import PhonePeImportDialog from "@/components/import/PhonePeImportDialog";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Transactions() {
@@ -27,6 +28,7 @@ export default function Transactions() {
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const { data: transactions, isLoading } = useGetTransactions(
     { month },
@@ -92,6 +94,13 @@ export default function Transactions() {
               className="pl-9 bg-card/50 border-border/50 rounded-xl"
             />
           </div>
+          <Button
+            variant="outline"
+            className="rounded-xl px-4 gap-1.5 border-primary/40 text-primary hover:bg-primary/5"
+            onClick={() => setIsImportOpen(true)}
+          >
+            <FileUp size={16} /> Import PDF
+          </Button>
           <Button 
             className="rounded-xl shadow-sm px-4" 
             onClick={() => { setEditingId(null); setIsFormOpen(true); }}
@@ -170,6 +179,11 @@ export default function Transactions() {
         onOpenChange={setIsFormOpen} 
         transactionId={editingId} 
         month={month}
+      />
+
+      <PhonePeImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
       />
     </div>
   );
