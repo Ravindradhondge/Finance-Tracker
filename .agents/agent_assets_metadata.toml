@@ -6,3 +6,9 @@ id = "eUg0bgEBXqNx_MDytEj0B"
 uri = "file://ledger-finance-tracker.tar.gz"
 type = "unspecified"
 title = "Ledger Finance Tracker — Source Code"
+
+[[outputs]]
+id = "S32yPaUdNDZVXtyETzubQ"
+uri = "file://LOCAL_SETUP_GUIDE.md"
+type = "text"
+title = "Step-by-Step Local Setup Guide"
