@@ -265,8 +265,14 @@ function dedup(txs: ParsedTx[]): ParsedTx[] {
   });
 }
 
+function sanitizeText(s: string): string {
+  // Strip null bytes and other control characters that PostgreSQL rejects
+  return s.replace(/\x00/g, "").replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").trim();
+}
+
 function parsePhonePeText(text: string): ParsedTx[] {
-  const normalised = text.replace(/[ \t]+/g, " ");
+  // Strip null bytes before any parsing — PDF extraction can produce \x00 in place of colons etc.
+  const normalised = text.replace(/\x00/g, ":").replace(/[ \t]+/g, " ");
 
   let results = strategy1(normalised);
   if (results.length > 0) {
@@ -361,16 +367,17 @@ router.post("/import/phonepe/confirm", async (req, res) => {
       return res.status(400).json({ error: "No transactions provided" });
     }
 
-    // Validate each row before attempting inserts
+    // Validate and sanitize each row before attempting inserts
     const rows = transactions
       .filter((tx) => tx.date && tx.description?.trim() && tx.type && tx.amount > 0)
       .map((tx) => ({
         amount: String(tx.amount),
         type: tx.type,
-        description: tx.description.trim(),
-        date: tx.date,
+        description: sanitizeText(tx.description),
+        date: sanitizeText(tx.date),
         categoryId: tx.categoryId ?? null,
-      }));
+      }))
+      .filter((tx) => tx.description.length > 0 && tx.date.length > 0);
 
     if (rows.length === 0) {
       return res.status(400).json({ error: "No valid transactions to import" });
