@@ -7,6 +7,9 @@ import {
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
 import { useState, useEffect } from "react";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -16,7 +19,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [isDark, setIsDark] = useState(() =>
     document.documentElement.classList.contains("dark")
   );
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     if (isDark) {
@@ -45,9 +47,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     ? name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
     : "?";
 
+  const currentLabel = navItems.find((i) => i.href === location)?.label ?? "FinTrack";
+
   return (
     <div className="flex min-h-[100dvh] w-full bg-background text-foreground selection:bg-primary/20">
-      {/* Sidebar — dark navy */}
+      {/* ── Desktop Sidebar ── */}
       <aside className="w-64 bg-sidebar text-sidebar-foreground hidden md:flex flex-col shrink-0">
         {/* Logo */}
         <div className="px-6 py-7 flex items-center gap-3 border-b border-sidebar-border">
@@ -80,9 +84,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Bottom section */}
+        {/* Desktop bottom: month + user */}
         <div className="p-3 border-t border-sidebar-border space-y-2">
-          {/* Month Navigator */}
           <div className="flex items-center gap-1 bg-sidebar-accent rounded-xl px-1 py-1">
             <button
               className="p-1.5 rounded-lg hover:bg-sidebar-foreground/10 text-sidebar-foreground/60 transition-colors"
@@ -101,7 +104,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          {/* User profile */}
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-accent transition-colors">
             <div className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center shrink-0 text-xs font-bold text-primary-foreground">
               {initials}
@@ -121,22 +123,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* ── Main Content ── */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top header */}
-        <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-border bg-background sticky top-0 z-30 shrink-0">
-          <div className="flex items-center gap-3">
-            {/* Mobile logo */}
-            <div className="md:hidden w-8 h-8 rounded-xl bg-primary flex items-center justify-center">
-              <Wallet size={15} className="text-white" />
+        <header className="h-14 flex items-center justify-between px-4 md:px-8 border-b border-border bg-background sticky top-0 z-30 shrink-0">
+          {/* Left: logo (mobile) + page title */}
+          <div className="flex items-center gap-2.5">
+            <div className="md:hidden w-7 h-7 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <Wallet size={13} className="text-white" />
             </div>
-            <h1 className="text-lg font-bold text-foreground">
-              {navItems.find((i) => i.href === location)?.label ?? "FinTrack"}
-            </h1>
+            <h1 className="text-base font-bold text-foreground">{currentLabel}</h1>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Month navigator (desktop header) */}
+          {/* Right controls */}
+          <div className="flex items-center gap-1.5">
+            {/* Month navigator — desktop header */}
             <div className="hidden sm:flex items-center gap-1 bg-muted rounded-xl px-1 py-1 border border-border/60">
               <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={prevMonth}>
                 <ChevronLeft size={14} />
@@ -153,16 +154,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-xl"
+              className="h-8 w-8 rounded-xl"
               onClick={() => setIsDark(!isDark)}
             >
-              {isDark ? <Sun size={16} /> : <Moon size={16} />}
+              {isDark ? <Sun size={15} /> : <Moon size={15} />}
             </Button>
 
-            {/* Mobile user avatar */}
-            <div className="md:hidden w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
-              <span className="text-xs font-bold text-primary">{initials}</span>
-            </div>
+            {/* Mobile user avatar — dropdown with logout */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="md:hidden w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-primary/30">
+                  <span className="text-xs font-bold text-primary">{initials}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                <div className="px-3 py-2">
+                  <p className="text-sm font-semibold text-foreground truncate">{name}</p>
+                  <p className="text-xs text-muted-foreground">Personal account</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-sm text-destructive focus:text-destructive gap-2">
+                  <LogOut size={14} />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
@@ -173,26 +189,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </main>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur-lg z-40">
-        {/* Mobile month navigator */}
-        <div className="flex items-center justify-center gap-2 px-4 pt-2 pb-0">
+      {/* ── Mobile Bottom Nav ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-lg">
+        {/* Month navigator strip */}
+        <div className="flex items-center justify-center gap-3 px-4 pt-2 pb-0.5 border-b border-border/40">
           <button
-            className="p-1 rounded-lg text-muted-foreground"
+            className="p-1.5 rounded-lg text-muted-foreground active:bg-muted transition-colors"
             onClick={prevMonth}
           >
             <ChevronLeft size={14} />
           </button>
-          <span className="text-xs font-semibold text-muted-foreground tracking-wide">
+          <span className="text-xs font-semibold text-muted-foreground tracking-wide min-w-[90px] text-center">
             {format(parseISO(`${month}-01`), "MMMM yyyy")}
           </span>
           <button
-            className="p-1 rounded-lg text-muted-foreground"
+            className="p-1.5 rounded-lg text-muted-foreground active:bg-muted transition-colors"
             onClick={nextMonth}
           >
             <ChevronRight size={14} />
           </button>
         </div>
+
+        {/* Nav items — 5 items, no logout */}
         <div className="flex justify-around items-center px-2 py-1 pb-safe">
           {navItems.map((item) => {
             const isActive = location === item.href;
@@ -200,22 +218,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-xl flex-1 min-w-0 ${
+                className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-xl flex-1 min-w-0 active:bg-muted/50 transition-colors ${
                   isActive ? "text-primary" : "text-muted-foreground"
                 }`}
               >
-                <item.icon size={19} strokeWidth={isActive ? 2.5 : 2} />
-                <span className="text-[9px] font-semibold tracking-wide truncate">{item.label}</span>
+                <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                <span className="text-[10px] font-semibold tracking-wide truncate">{item.label}</span>
               </Link>
             );
           })}
-          <button
-            onClick={logout}
-            className="flex flex-col items-center gap-0.5 px-2 py-2 rounded-xl flex-1 text-muted-foreground"
-          >
-            <LogOut size={19} strokeWidth={2} />
-            <span className="text-[9px] font-semibold tracking-wide">Logout</span>
-          </button>
         </div>
       </nav>
     </div>

@@ -7,12 +7,9 @@ import {
 } from "@workspace/api-client-react";
 import { format, parseISO } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, ArrowDownRight, Plus, MoreHorizontal, Pencil, Trash2, Search, FileUp, SlidersHorizontal } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Plus, Pencil, Trash2, Search, FileUp, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionFormDialog } from "@/components/transactions/TransactionFormDialog";
@@ -172,7 +169,7 @@ export default function Transactions() {
                   {txs.map((tx, idx) => (
                     <div
                       key={tx.id}
-                      className={`flex items-center justify-between px-4 py-3.5 hover:bg-muted/40 transition-colors group ${
+                      className={`flex items-center justify-between px-4 py-3.5 hover:bg-muted/40 active:bg-muted/60 transition-colors group ${
                         idx < txs.length - 1 ? "border-b border-border/40" : ""
                       }`}
                     >
@@ -197,26 +194,30 @@ export default function Transactions() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className={`font-bold text-sm tabular-nums ${tx.type === "income" ? "text-emerald-500" : "text-foreground"}`}>
                           {tx.type === "income" ? "+" : "-"}₹{tx.amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                         </span>
 
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
-                              <MoreHorizontal size={16} />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-36 rounded-xl">
-                            <DropdownMenuItem onClick={() => { setEditingId(tx.id); setIsFormOpen(true); }} className="text-sm">
-                              <Pencil size={14} className="mr-2" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive focus:text-destructive text-sm" onClick={() => handleDelete(tx.id)}>
-                              <Trash2 size={14} className="mr-2" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {/* Edit/Delete — always visible on mobile, hover-only on desktop */}
+                        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+                            onClick={() => { setEditingId(tx.id); setIsFormOpen(true); }}
+                          >
+                            <Pencil size={14} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDelete(tx.id)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
