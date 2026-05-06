@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMonthContext } from "@/hooks/use-month";
-import { 
+import {
   useGetBudgets, getGetBudgetsQueryKey,
   useCreateBudget,
   useGetCategories,
@@ -11,9 +11,11 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Target, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Target, AlertCircle, CheckCircle2, PlusCircle, TrendingDown } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { format, parseISO } from "date-fns";
 
 export default function Budgets() {
   const { month } = useMonthContext();
@@ -24,9 +26,8 @@ export default function Budgets() {
     { month },
     { query: { queryKey: getGetBudgetsQueryKey({ month }) } }
   );
-
   const { data: categories, isLoading: isCategoriesLoading } = useGetCategories();
-  
+
   const createMutation = useCreateBudget();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editAmount, setEditAmount] = useState("");
@@ -37,7 +38,6 @@ export default function Budgets() {
       toast({ variant: "destructive", description: "Please enter a valid amount." });
       return;
     }
-
     createMutation.mutate(
       { data: { categoryId, month, amount } },
       {
@@ -45,36 +45,87 @@ export default function Budgets() {
           queryClient.invalidateQueries({ queryKey: getGetBudgetsQueryKey({ month }) });
           queryClient.invalidateQueries({ queryKey: getGetMonthlySummaryQueryKey({ month }) });
           setEditingId(null);
-          toast({ description: "Intention updated." });
+          toast({ description: "Budget updated." });
         },
         onError: () => {
-          toast({ variant: "destructive", description: "Failed to update intention." });
+          toast({ variant: "destructive", description: "Failed to update budget." });
         }
       }
     );
   };
 
-  const expenseCategories = categories?.filter(c => c.type === 'expense' || c.type === 'both') || [];
+  const expenseCategories = categories?.filter(c => c.type === "expense" || c.type === "both") || [];
+
+  const totalBudgeted = budgets?.reduce((s, b) => s + (b.amount || 0), 0) || 0;
+  const totalSpent = budgets?.reduce((s, b) => s + (b.spent || 0), 0) || 0;
+  const categoriesWithBudget = budgets?.filter(b => b.amount > 0).length || 0;
+  const overspentCount = budgets?.filter(b => b.amount > 0 && (b.spent || 0) > b.amount).length || 0;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      <div className="max-w-2xl">
-        <h2 className="text-3xl font-serif font-medium tracking-tight mb-3">Monthly Intentions</h2>
-        <p className="text-muted-foreground text-lg leading-relaxed">
-          Set gentle limits for your spending categories. This isn't about restriction, but aligning your money with your values.
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-foreground tracking-tight">Monthly Budgets</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Set spending limits for <span className="font-semibold text-foreground">{format(parseISO(`${month}-01`), "MMMM yyyy")}</span>
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+      {/* Summary cards */}
+      {!isBudgetsLoading && categoriesWithBudget > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="shadow-sm border-border/60">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Budget</p>
+              <p className="text-xl font-bold text-foreground mt-1">₹{totalBudgeted.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-border/60">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Spent</p>
+              <p className={`text-xl font-bold mt-1 ${totalSpent > totalBudgeted ? "text-red-500" : "text-foreground"}`}>
+                ₹{totalSpent.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-border/60">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Remaining</p>
+              <p className={`text-xl font-bold mt-1 ${totalBudgeted - totalSpent < 0 ? "text-red-500" : "text-emerald-500"}`}>
+                ₹{Math.abs(totalBudgeted - totalSpent).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                {totalBudgeted - totalSpent < 0 && " over"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-border/60">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-xl font-bold text-foreground">{categoriesWithBudget}</p>
+                <Badge variant="secondary" className={`text-xs ${overspentCount > 0 ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-600"}`}>
+                  {overspentCount > 0 ? `${overspentCount} over` : "On track"}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Budget cards grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {isBudgetsLoading || isCategoriesLoading ? (
-          Array(4).fill(0).map((_, i) => (
-            <Card key={i} className="bg-card/40 backdrop-blur-sm border-border/50 shadow-sm">
-              <CardContent className="p-6 space-y-4">
-                <div className="flex justify-between">
-                  <Skeleton className="h-6 w-32" />
-                  <Skeleton className="h-6 w-16" />
+          Array(6).fill(0).map((_, i) => (
+            <Card key={i} className="shadow-sm border-border/60">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex justify-between items-center">
+                  <Skeleton className="h-5 w-28" />
+                  <Skeleton className="h-5 w-16" />
                 </div>
-                <Skeleton className="h-2 w-full" />
+                <Skeleton className="h-2 w-full rounded-full" />
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
               </CardContent>
             </Card>
           ))
@@ -82,80 +133,134 @@ export default function Budgets() {
           expenseCategories.map(category => {
             const budget = budgets?.find(b => b.categoryId === category.id);
             const isEditing = editingId === category.id;
-            
-            // If no budget is set, amount is 0, percent is 0
             const amount = budget?.amount || 0;
             const spent = budget?.spent || 0;
-            const percentUsed = budget?.percentUsed || 0;
-            const remaining = amount > 0 ? amount - spent : 0;
+            const percentUsed = amount > 0 ? (spent / amount) * 100 : 0;
+            const remaining = amount - spent;
             const overspent = spent > amount && amount > 0;
+            const isGood = amount > 0 && percentUsed <= 75;
+            const isWarning = amount > 0 && percentUsed > 75 && percentUsed <= 100;
 
             return (
-              <Card key={category.id} className="bg-card/40 backdrop-blur-sm border-border/50 shadow-sm hover:shadow-md transition-shadow duration-300">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-background border border-border/50 shadow-sm" style={{ color: category.color }}>
-                        <Target size={16} />
+              <Card key={category.id} className={`shadow-sm border-border/60 hover:shadow-md transition-all ${
+                overspent ? "border-red-500/30 bg-red-500/5" : ""
+              }`}>
+                <CardContent className="p-5">
+                  {/* Category header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: `${category.color}20`, color: category.color }}
+                      >
+                        <Target size={16} strokeWidth={2.5} />
                       </div>
-                      <span className="font-medium text-lg text-foreground/90">{category.name}</span>
+                      <div>
+                        <p className="font-bold text-sm text-foreground">{category.name}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{category.type}</p>
+                      </div>
                     </div>
-                    
+
+                    {/* Amount / edit */}
                     {isEditing ? (
-                      <div className="flex items-center gap-2">
-                        <Input 
-                          type="number" 
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="number"
                           autoFocus
-                          placeholder="Amount" 
-                          className="w-24 h-8 text-right bg-background border-border/50 rounded-lg"
+                          placeholder="0"
+                          className="w-24 h-8 text-right bg-background border-border/60 rounded-lg text-sm"
                           value={editAmount}
                           onChange={(e) => setEditAmount(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSaveBudget(category.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveBudget(category.id);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
                         />
-                        <Button size="sm" className="h-8 rounded-lg" onClick={() => handleSaveBudget(category.id)}>Save</Button>
-                        <Button size="sm" variant="ghost" className="h-8 rounded-lg" onClick={() => setEditingId(null)}>Cancel</Button>
+                        <Button size="sm" className="h-8 rounded-lg px-3" onClick={() => handleSaveBudget(category.id)}>
+                          Save
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 rounded-lg px-2" onClick={() => setEditingId(null)}>
+                          ✕
+                        </Button>
                       </div>
                     ) : (
-                      <div className="text-right cursor-pointer group" onClick={() => { setEditingId(category.id); setEditAmount(amount ? amount.toString() : ""); }}>
+                      <button
+                        className="text-right hover:opacity-70 transition-opacity"
+                        onClick={() => { setEditingId(category.id); setEditAmount(amount > 0 ? amount.toString() : ""); }}
+                      >
                         {amount > 0 ? (
-                          <>
-                            <p className="font-serif text-lg tracking-tight group-hover:text-primary transition-colors">₹{amount.toFixed(2)}</p>
-                            <p className="text-xs text-muted-foreground">Budget</p>
-                          </>
+                          <div>
+                            <p className="text-base font-bold text-foreground">₹{amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</p>
+                            <p className="text-xs text-muted-foreground">budget</p>
+                          </div>
                         ) : (
-                          <span className="text-sm text-primary underline underline-offset-4 decoration-primary/30 hover:decoration-primary transition-colors">Set Intention</span>
+                          <div className="flex items-center gap-1 text-primary text-xs font-semibold">
+                            <PlusCircle size={13} />
+                            Set budget
+                          </div>
                         )}
-                      </div>
+                      </button>
                     )}
                   </div>
 
+                  {/* Progress */}
                   {amount > 0 && (
-                    <div className="space-y-3 mt-6">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">₹{spent.toFixed(2)} spent</span>
+                    <div className="space-y-2">
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            overspent ? "bg-red-500" : isWarning ? "bg-orange-400" : "bg-primary"
+                          }`}
+                          style={{ width: `${Math.min(percentUsed, 100)}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground font-medium">
+                          ₹{spent.toLocaleString("en-IN", { maximumFractionDigits: 0 })} spent
+                        </span>
                         {overspent ? (
-                          <span className="text-destructive font-medium flex items-center gap-1">
-                            <AlertCircle size={14} /> ₹{Math.abs(remaining).toFixed(2)} over
+                          <span className="text-red-500 font-bold flex items-center gap-1">
+                            <AlertCircle size={11} />
+                            ₹{Math.abs(remaining).toLocaleString("en-IN", { maximumFractionDigits: 0 })} over
+                          </span>
+                        ) : isGood ? (
+                          <span className="text-emerald-500 font-bold flex items-center gap-1">
+                            <CheckCircle2 size={11} />
+                            ₹{remaining.toLocaleString("en-IN", { maximumFractionDigits: 0 })} left
                           </span>
                         ) : (
-                          <span className="text-muted-foreground">₹{remaining.toFixed(2)} left</span>
+                          <span className="text-orange-500 font-bold">
+                            ₹{remaining.toLocaleString("en-IN", { maximumFractionDigits: 0 })} left
+                          </span>
                         )}
                       </div>
-                      <Progress 
-                        value={Math.min(percentUsed, 100)} 
-                        className="h-2 bg-muted overflow-hidden rounded-full" 
-                        indicatorClassName={overspent ? "bg-destructive" : percentUsed > 85 ? "bg-orange-400" : "bg-primary"}
-                      />
+                      <div className="flex items-center justify-between">
+                        <div className="w-full bg-muted rounded-full h-1" />
+                        <span className={`text-xs font-bold ml-2 shrink-0 ${
+                          overspent ? "text-red-500" : isWarning ? "text-orange-500" : "text-muted-foreground"
+                        }`}>{Math.round(percentUsed)}%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {amount === 0 && (
+                    <div className="mt-2 py-2 border border-dashed border-border/60 rounded-xl text-center">
+                      <p className="text-xs text-muted-foreground">No budget set · click to add one</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
-            )
+            );
           })
         ) : (
-          <div className="col-span-full p-12 text-center text-muted-foreground bg-card/40 rounded-2xl border border-border/50">
-            <p className="text-lg font-serif">No expense categories yet.</p>
-            <p className="text-sm mt-1">Create some categories to start setting intentions.</p>
+          <div className="col-span-full">
+            <Card className="shadow-sm border-border/60 border-dashed">
+              <CardContent className="py-16 text-center text-muted-foreground">
+                <TrendingDown size={32} className="mx-auto mb-3 opacity-20" />
+                <p className="font-semibold text-base text-foreground">No expense categories yet</p>
+                <p className="text-sm mt-1">Create categories first, then set budgets for them.</p>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>

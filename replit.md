@@ -39,10 +39,12 @@ artifacts-monorepo/
 
 ### `artifacts/finance-tracker` — Personal Finance Tracker
 - React + Vite frontend at `/` (previewPath)
-- Pages: `/` (dashboard), `/transactions`, `/budgets`, `/categories`
+- Pages: `/` (dashboard), `/transactions`, `/budgets`, `/reports` (new), `/categories`
 - Uses `@workspace/api-client-react` for API hooks
-- Warm cream + sage green theme, DM Sans + Playfair Display fonts
+- Modern indigo/navy theme, Inter + Plus Jakarta Sans fonts, dark mode toggle
+- Mobile-friendly: dark sidebar (desktop) + bottom nav (mobile)
 - Month navigation context via `src/hooks/use-month.tsx`
+- Reports page: income vs expenses bar chart, savings rate trend, category breakdown, day-of-week spending
 
 ### `artifacts/api-server` — Express API Server
 - Routes: `/api/transactions`, `/api/categories`, `/api/budgets`, `/api/summary/*`

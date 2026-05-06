@@ -9,6 +9,7 @@ import Dashboard from "@/pages/dashboard";
 import Transactions from "@/pages/transactions";
 import Budgets from "@/pages/budgets";
 import Categories from "@/pages/categories";
+import Reports from "@/pages/reports";
 import LoginScreen from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
@@ -28,6 +29,7 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/transactions" component={Transactions} />
         <Route path="/budgets" component={Budgets} />
+        <Route path="/reports" component={Reports} />
         <Route path="/categories" component={Categories} />
         <Route component={NotFound} />
       </Switch>
