@@ -2,9 +2,11 @@ import { pgTable, text, serial, timestamp, numeric, integer, date } from "drizzl
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { categoriesTable } from "./categories";
+import { usersTable } from "./users";
 
 export const transactionsTable = pgTable("transactions", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => usersTable.id, { onDelete: "cascade" }),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   type: text("type").notNull(), // 'income' | 'expense'
   description: text("description").notNull(),

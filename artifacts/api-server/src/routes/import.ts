@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import multer from "multer";
 import { db } from "@workspace/db";
 import { transactionsTable, categoriesTable } from "@workspace/db/schema";
+import { getUserId } from "./_helpers";
 
 const _require = createRequire(import.meta.url);
 const pdfParse: (buffer: Buffer) => Promise<{ text: string }> = _require("pdf-parse");
@@ -353,6 +354,7 @@ router.post("/import/phonepe/debug", upload.single("pdf"), async (req, res) => {
 // POST /api/import/phonepe/confirm
 router.post("/import/phonepe/confirm", async (req, res) => {
   try {
+    const userId = getUserId(req);
     const { transactions } = req.body as {
       transactions: Array<{
         date: string;
@@ -371,6 +373,7 @@ router.post("/import/phonepe/confirm", async (req, res) => {
     const rows = transactions
       .filter((tx) => tx.date && tx.description?.trim() && tx.type && tx.amount > 0)
       .map((tx) => ({
+        userId: userId ?? undefined,
         amount: String(tx.amount),
         type: tx.type,
         description: sanitizeText(tx.description),

@@ -38,9 +38,9 @@ function Router() {
 }
 
 function AppShell() {
-  const { name } = useUser();
+  const { user } = useUser();
 
-  if (!name) {
+  if (!user) {
     return <LoginScreen />;
   }
 

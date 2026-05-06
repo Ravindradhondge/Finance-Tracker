@@ -1,12 +1,17 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql } from "drizzle-orm";
 import { db, budgetsTable, categoriesTable, transactionsTable } from "@workspace/db";
+import { getUserId } from "./_helpers";
 
 const router: IRouter = Router();
 
 router.get("/budgets", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
   const { month } = req.query as { month?: string };
   const targetMonth = month ?? getCurrentMonth();
+
+  const conditions = [eq(budgetsTable.month, targetMonth)];
+  if (userId !== null) conditions.push(eq(budgetsTable.userId, userId));
 
   const budgets = await db
     .select({
@@ -19,22 +24,23 @@ router.get("/budgets", async (req, res): Promise<void> => {
     })
     .from(budgetsTable)
     .innerJoin(categoriesTable, eq(budgetsTable.categoryId, categoriesTable.id))
-    .where(eq(budgetsTable.month, targetMonth));
+    .where(and(...conditions));
 
   const result = await Promise.all(
     budgets.map(async (b) => {
       const [start, end] = getMonthRange(b.month);
+      const txConditions = [
+        eq(transactionsTable.categoryId, b.categoryId),
+        eq(transactionsTable.type, "expense"),
+        sql`${transactionsTable.date} >= ${start}`,
+        sql`${transactionsTable.date} <= ${end}`,
+      ];
+      if (userId !== null) txConditions.push(eq(transactionsTable.userId, userId));
+
       const [spentRow] = await db
         .select({ total: sql<string>`COALESCE(SUM(${transactionsTable.amount}), 0)` })
         .from(transactionsTable)
-        .where(
-          and(
-            eq(transactionsTable.categoryId, b.categoryId),
-            eq(transactionsTable.type, "expense"),
-            sql`${transactionsTable.date} >= ${start}`,
-            sql`${transactionsTable.date} <= ${end}`
-          )
-        );
+        .where(and(...txConditions));
 
       const budgetAmount = parseFloat(b.amount);
       const spent = parseFloat(spentRow?.total ?? "0");
@@ -59,6 +65,7 @@ router.get("/budgets", async (req, res): Promise<void> => {
 });
 
 router.post("/budgets", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
   const { categoryId, month, amount } = req.body;
 
   if (!categoryId || !month || !amount) {
@@ -69,12 +76,13 @@ router.post("/budgets", async (req, res): Promise<void> => {
   const [row] = await db
     .insert(budgetsTable)
     .values({
+      userId: userId ?? undefined,
       categoryId,
       month,
       amount: String(amount),
     })
     .onConflictDoUpdate({
-      target: [budgetsTable.categoryId, budgetsTable.month],
+      target: [budgetsTable.userId, budgetsTable.categoryId, budgetsTable.month],
       set: { amount: String(amount) },
     })
     .returning();
@@ -93,17 +101,18 @@ router.post("/budgets", async (req, res): Promise<void> => {
     .where(eq(budgetsTable.id, row.id));
 
   const [start, end] = getMonthRange(withCategory.month);
+  const txConditions = [
+    eq(transactionsTable.categoryId, withCategory.categoryId),
+    eq(transactionsTable.type, "expense"),
+    sql`${transactionsTable.date} >= ${start}`,
+    sql`${transactionsTable.date} <= ${end}`,
+  ];
+  if (userId !== null) txConditions.push(eq(transactionsTable.userId, userId));
+
   const [spentRow] = await db
     .select({ total: sql<string>`COALESCE(SUM(${transactionsTable.amount}), 0)` })
     .from(transactionsTable)
-    .where(
-      and(
-        eq(transactionsTable.categoryId, withCategory.categoryId),
-        eq(transactionsTable.type, "expense"),
-        sql`${transactionsTable.date} >= ${start}`,
-        sql`${transactionsTable.date} <= ${end}`
-      )
-    );
+    .where(and(...txConditions));
 
   const budgetAmount = parseFloat(withCategory.amount);
   const spent = parseFloat(spentRow?.total ?? "0");

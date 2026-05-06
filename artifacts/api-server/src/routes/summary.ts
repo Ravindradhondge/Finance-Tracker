@@ -1,13 +1,17 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { db, transactionsTable, categoriesTable } from "@workspace/db";
+import { getUserId } from "./_helpers";
 
 const router: IRouter = Router();
 
 router.get("/summary/monthly", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
   const { month } = req.query as { month?: string };
   const targetMonth = month ?? getCurrentMonth();
   const [start, end] = getMonthRange(targetMonth);
+
+  const userFilter = userId !== null ? [eq(transactionsTable.userId, userId)] : [];
 
   const [incomeRow] = await db
     .select({ total: sql<string>`COALESCE(SUM(${transactionsTable.amount}), 0)`, count: sql<string>`COUNT(*)` })
@@ -16,7 +20,8 @@ router.get("/summary/monthly", async (req, res): Promise<void> => {
       and(
         eq(transactionsTable.type, "income"),
         sql`${transactionsTable.date} >= ${start}`,
-        sql`${transactionsTable.date} <= ${end}`
+        sql`${transactionsTable.date} <= ${end}`,
+        ...userFilter
       )
     );
 
@@ -27,7 +32,8 @@ router.get("/summary/monthly", async (req, res): Promise<void> => {
       and(
         eq(transactionsTable.type, "expense"),
         sql`${transactionsTable.date} >= ${start}`,
-        sql`${transactionsTable.date} <= ${end}`
+        sql`${transactionsTable.date} <= ${end}`,
+        ...userFilter
       )
     );
 
@@ -37,20 +43,16 @@ router.get("/summary/monthly", async (req, res): Promise<void> => {
   const savingsRate = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
   const transactionCount = parseInt(incomeRow?.count ?? "0") + parseInt(expenseRow?.count ?? "0");
 
-  res.json({
-    month: targetMonth,
-    totalIncome,
-    totalExpenses,
-    savings,
-    savingsRate,
-    transactionCount,
-  });
+  res.json({ month: targetMonth, totalIncome, totalExpenses, savings, savingsRate, transactionCount });
 });
 
 router.get("/summary/categories", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
   const { month } = req.query as { month?: string };
   const targetMonth = month ?? getCurrentMonth();
   const [start, end] = getMonthRange(targetMonth);
+
+  const userFilter = userId !== null ? [eq(transactionsTable.userId, userId)] : [];
 
   const rows = await db
     .select({
@@ -66,7 +68,8 @@ router.get("/summary/categories", async (req, res): Promise<void> => {
       and(
         eq(transactionsTable.type, "expense"),
         sql`${transactionsTable.date} >= ${start}`,
-        sql`${transactionsTable.date} <= ${end}`
+        sql`${transactionsTable.date} <= ${end}`,
+        ...userFilter
       )
     )
     .groupBy(transactionsTable.categoryId, categoriesTable.name, categoriesTable.color)
@@ -86,8 +89,10 @@ router.get("/summary/categories", async (req, res): Promise<void> => {
   );
 });
 
-router.get("/summary/trends", async (_req, res): Promise<void> => {
+router.get("/summary/trends", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
   const months = getLast6Months();
+  const userFilter = userId !== null ? [eq(transactionsTable.userId, userId)] : [];
 
   const trends = await Promise.all(
     months.map(async (month) => {
@@ -100,7 +105,8 @@ router.get("/summary/trends", async (_req, res): Promise<void> => {
           and(
             eq(transactionsTable.type, "income"),
             sql`${transactionsTable.date} >= ${start}`,
-            sql`${transactionsTable.date} <= ${end}`
+            sql`${transactionsTable.date} <= ${end}`,
+            ...userFilter
           )
         );
 
@@ -111,26 +117,25 @@ router.get("/summary/trends", async (_req, res): Promise<void> => {
           and(
             eq(transactionsTable.type, "expense"),
             sql`${transactionsTable.date} >= ${start}`,
-            sql`${transactionsTable.date} <= ${end}`
+            sql`${transactionsTable.date} <= ${end}`,
+            ...userFilter
           )
         );
 
       const income = parseFloat(incomeRow?.total ?? "0");
       const expenses = parseFloat(expenseRow?.total ?? "0");
 
-      return {
-        month,
-        income,
-        expenses,
-        savings: income - expenses,
-      };
+      return { month, income, expenses, savings: income - expenses };
     })
   );
 
   res.json(trends);
 });
 
-router.get("/summary/recent", async (_req, res): Promise<void> => {
+router.get("/summary/recent", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
+  const userFilter = userId !== null ? [eq(transactionsTable.userId, userId)] : [];
+
   const rows = await db
     .select({
       id: transactionsTable.id,
@@ -145,6 +150,7 @@ router.get("/summary/recent", async (_req, res): Promise<void> => {
     })
     .from(transactionsTable)
     .leftJoin(categoriesTable, eq(transactionsTable.categoryId, categoriesTable.id))
+    .where(userFilter.length > 0 ? and(...userFilter) : undefined)
     .orderBy(desc(transactionsTable.date), desc(transactionsTable.createdAt))
     .limit(10);
 

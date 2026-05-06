@@ -1,10 +1,12 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { db, transactionsTable, categoriesTable } from "@workspace/db";
+import { getUserId } from "./_helpers";
 
 const router: IRouter = Router();
 
 router.get("/transactions", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
   const { month, categoryId, type } = req.query as {
     month?: string;
     categoryId?: string;
@@ -12,6 +14,10 @@ router.get("/transactions", async (req, res): Promise<void> => {
   };
 
   const conditions = [];
+
+  if (userId !== null) {
+    conditions.push(eq(transactionsTable.userId, userId));
+  }
 
   if (month) {
     const start = `${month}-01`;
@@ -59,6 +65,7 @@ router.get("/transactions", async (req, res): Promise<void> => {
 });
 
 router.post("/transactions", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
   const { amount, type, description, date, categoryId } = req.body;
 
   if (!amount || !type || !description || !date) {
@@ -74,6 +81,7 @@ router.post("/transactions", async (req, res): Promise<void> => {
   const [row] = await db
     .insert(transactionsTable)
     .values({
+      userId: userId ?? undefined,
       amount: String(amount),
       type,
       description,
@@ -108,6 +116,7 @@ router.post("/transactions", async (req, res): Promise<void> => {
 });
 
 router.get("/transactions/:id", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);
 
@@ -115,6 +124,9 @@ router.get("/transactions/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
+
+  const conditions = [eq(transactionsTable.id, id)];
+  if (userId !== null) conditions.push(eq(transactionsTable.userId, userId));
 
   const [row] = await db
     .select({
@@ -130,7 +142,7 @@ router.get("/transactions/:id", async (req, res): Promise<void> => {
     })
     .from(transactionsTable)
     .leftJoin(categoriesTable, eq(transactionsTable.categoryId, categoriesTable.id))
-    .where(eq(transactionsTable.id, id));
+    .where(and(...conditions));
 
   if (!row) {
     res.status(404).json({ error: "Transaction not found" });
@@ -147,6 +159,7 @@ router.get("/transactions/:id", async (req, res): Promise<void> => {
 });
 
 router.put("/transactions/:id", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);
 
@@ -162,16 +175,13 @@ router.put("/transactions/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const conditions = [eq(transactionsTable.id, id)];
+  if (userId !== null) conditions.push(eq(transactionsTable.userId, userId));
+
   const [updated] = await db
     .update(transactionsTable)
-    .set({
-      amount: String(amount),
-      type,
-      description,
-      date,
-      categoryId: categoryId ?? null,
-    })
-    .where(eq(transactionsTable.id, id))
+    .set({ amount: String(amount), type, description, date, categoryId: categoryId ?? null })
+    .where(and(...conditions))
     .returning();
 
   if (!updated) {
@@ -205,6 +215,7 @@ router.put("/transactions/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/transactions/:id", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(rawId, 10);
 
@@ -213,9 +224,12 @@ router.delete("/transactions/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const conditions = [eq(transactionsTable.id, id)];
+  if (userId !== null) conditions.push(eq(transactionsTable.userId, userId));
+
   const [deleted] = await db
     .delete(transactionsTable)
-    .where(eq(transactionsTable.id, id))
+    .where(and(...conditions))
     .returning();
 
   if (!deleted) {
