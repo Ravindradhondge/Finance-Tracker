@@ -40,7 +40,6 @@ const MONTH_MAP: Record<string, string> = {
 };
 
 function parseAmount(raw: string): number {
-  // strip any leading non-digit chars (currency symbols, spaces)
   const cleaned = raw.replace(/[^\d.,]/g, "").replace(/,/g, "");
   return parseFloat(cleaned) || 0;
 }
@@ -48,7 +47,9 @@ function parseAmount(raw: string): number {
 function parseDate(raw: string): string {
   const m = raw.match(/([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(\d{4})/);
   if (!m) return "";
-  return `${m[3]}-${MONTH_MAP[m[1]] ?? "00"}-${m[2].padStart(2, "0")}`;
+  const month = MONTH_MAP[m[1]];
+  if (!month) return "";
+  return `${m[3]}-${month}-${m[2].padStart(2, "0")}`;
 }
 
 function isInternalTransfer(desc: string): boolean {
@@ -57,6 +58,11 @@ function isInternalTransfer(desc: string): boolean {
     (lower.includes("transfer to") && /x{4,}/i.test(desc)) ||
     (lower.includes("transfer from") && /x{4,}/i.test(desc))
   );
+}
+
+// Returns true if string looks like a time value — "09 20 am", "10:28 PM", "09:20:00", etc.
+function isTimeString(s: string): boolean {
+  return /^\d{1,2}[\s:]\d{2}(\s*(am|pm))?(\s*:\d{2})?$/i.test(s.trim());
 }
 
 function cleanDescription(desc: string): string {
@@ -80,8 +86,6 @@ type ParsedTx = {
 // Strategy 1: match full row on one line (with any currency symbol or none before number)
 function strategy1(text: string): ParsedTx[] {
   const results: ParsedTx[] = [];
-  // The ₹ character (U+20B9) might come out as various things; make it flexible
-  // Match: "Mon DD, YYYY  <desc>  DEBIT|CREDIT  [any non-digit]?  number"
   const re = /([A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4})\s+(.+?)\s+(DEBIT|CREDIT)\s+[^\d\n\r]*([\d,]+\.?\d*)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
@@ -89,6 +93,8 @@ function strategy1(text: string): ParsedTx[] {
     if (!date) continue;
     const desc = m[2].replace(/\s+/g, " ").trim();
     if (!desc || desc.length < 2) continue;
+    // Skip if description is just a time value
+    if (isTimeString(desc)) continue;
     const type = m[3] === "CREDIT" ? "income" : "expense";
     const amount = parseAmount(m[4]);
     if (amount <= 0) continue;
@@ -113,11 +119,9 @@ function strategy2(text: string): ParsedTx[] {
     const date = parseDate(dateMatch[1]);
     if (!date) continue;
 
-    // Collect up to 3 lines after the date line to find DEBIT/CREDIT
     const block = [lines[i]];
     for (let j = 1; j <= 3 && i + j < lines.length; j++) {
       const next = lines[i + j];
-      // Stop if the next line starts a new date
       if (/^[A-Z][a-z]{2}\s+\d{1,2},/.test(next)) break;
       block.push(next);
     }
@@ -130,10 +134,21 @@ function strategy2(text: string): ParsedTx[] {
     const amount = parseAmount(taMatch[2]);
     if (amount <= 0) continue;
 
-    // Description is everything between the date and DEBIT|CREDIT
     const descMatch = blockText.match(/^[A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4}\s+(.+?)\s+(DEBIT|CREDIT)/);
-    const desc = descMatch ? descMatch[1].trim() : dateMatch[2].trim();
-    if (!desc || desc.length < 2) continue;
+    let desc = descMatch ? descMatch[1].trim() : dateMatch[2].trim();
+
+    // If description is a time, try to get text from lines after DEBIT/CREDIT instead
+    if (isTimeString(desc)) {
+      const afterDebitIdx = blockText.search(/(DEBIT|CREDIT)[^\d]*([\d,]+\.?\d*)/);
+      if (afterDebitIdx !== -1) {
+        const afterDebit = blockText.substring(afterDebitIdx).replace(/(DEBIT|CREDIT)[^\d]*([\d,]+\.?\d*)\s*/i, "").trim();
+        if (afterDebit.length >= 2 && !isTimeString(afterDebit)) {
+          desc = afterDebit;
+        }
+      }
+    }
+
+    if (!desc || desc.length < 2 || isTimeString(desc)) continue;
     if (isInternalTransfer(desc)) continue;
 
     results.push({ date, description: cleanDescription(desc), type, amount, categoryName: categorize(desc, type) });
@@ -142,9 +157,9 @@ function strategy2(text: string): ParsedTx[] {
 }
 
 // Strategy 3: find all DEBIT/CREDIT occurrences, then look backwards for a date
+// and also forwards for the merchant name (newer PhonePe format puts merchant AFTER the amount)
 function strategy3(text: string): ParsedTx[] {
   const results: ParsedTx[] = [];
-  // Find all "DEBIT ₹X" or "CREDIT ₹X" or "DEBIT X" patterns
   const re = /(DEBIT|CREDIT)\s*[^\d\r\n]*([\d,]+\.?\d*)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
@@ -162,8 +177,77 @@ function strategy3(text: string): ParsedTx[] {
 
     // Description: text between the date and DEBIT/CREDIT
     const dateEnd = before.lastIndexOf(lastDateStr) + lastDateStr.length;
-    const desc = before.substring(dateEnd).replace(/\s+/g, " ").trim();
-    if (!desc || desc.length < 2) continue;
+    let desc = before.substring(dateEnd).replace(/\s+/g, " ").trim();
+
+    // If description is a time or empty, look AFTER the amount for the merchant name
+    if (!desc || desc.length < 2 || isTimeString(desc)) {
+      const afterMatch = text.substring(m.index + m[0].length);
+      // Grab the next line(s) after the amount — merchant names appear there in newer PhonePe format
+      const lines = afterMatch.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      for (const line of lines.slice(0, 3)) {
+        // Stop if we hit another date or another DEBIT/CREDIT
+        if (/^[A-Z][a-z]{2}\s+\d{1,2},/.test(line)) break;
+        if (/(DEBIT|CREDIT)/i.test(line)) break;
+        // Skip pure time strings, pure numbers, very short strings
+        if (isTimeString(line)) continue;
+        if (/^[\d.,\s₹]+$/.test(line)) continue;
+        if (line.length < 3) continue;
+        desc = line;
+        break;
+      }
+    }
+
+    if (!desc || desc.length < 2 || isTimeString(desc)) continue;
+    if (isInternalTransfer(desc)) continue;
+
+    results.push({ date, description: cleanDescription(desc), type, amount, categoryName: categorize(desc, type) });
+  }
+  return results;
+}
+
+// Strategy 4: newer PhonePe format — date + time on one line, merchant on next, then DEBIT/CREDIT
+// Example line pattern: "Apr 03, 2026  09:20 AM" followed by "Merchant Name" then "DEBIT  ₹20"
+function strategy4(text: string): ParsedTx[] {
+  const results: ParsedTx[] = [];
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  for (let i = 0; i < lines.length; i++) {
+    // Look for a line that is just a date (possibly with time)
+    const dateLineMatch = lines[i].match(/^([A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4})(\s+\d{1,2}[\s:]\d{2}(\s*(am|pm))?)?$/i);
+    if (!dateLineMatch) continue;
+
+    const date = parseDate(dateLineMatch[1]);
+    if (!date) continue;
+
+    // Next few lines: look for merchant name, then DEBIT/CREDIT + amount
+    let desc = "";
+    let type: "income" | "expense" | null = null;
+    let amount = 0;
+
+    for (let j = 1; j <= 5 && i + j < lines.length; j++) {
+      const line = lines[i + j];
+
+      // If it looks like a new date, stop
+      if (/^[A-Z][a-z]{2}\s+\d{1,2},/.test(line)) break;
+
+      const typeAmtMatch = line.match(/(DEBIT|CREDIT)\s*[^\d]*([\d,]+\.?\d*)/i);
+      if (typeAmtMatch) {
+        type = typeAmtMatch[1].toUpperCase() === "CREDIT" ? "income" : "expense";
+        amount = parseAmount(typeAmtMatch[2]);
+        break;
+      }
+
+      // Skip time-only lines
+      if (isTimeString(line)) continue;
+      // Skip lines that are just numbers/amounts
+      if (/^[\d.,\s₹]+$/.test(line)) continue;
+      // Use as description if we don't have one yet
+      if (!desc && line.length >= 3) {
+        desc = line;
+      }
+    }
+
+    if (!desc || !type || amount <= 0) continue;
     if (isInternalTransfer(desc)) continue;
 
     results.push({ date, description: cleanDescription(desc), type, amount, categoryName: categorize(desc, type) });
@@ -182,10 +266,8 @@ function dedup(txs: ParsedTx[]): ParsedTx[] {
 }
 
 function parsePhonePeText(text: string): ParsedTx[] {
-  // Normalize: collapse excessive whitespace but keep newlines for strategy 2
   const normalised = text.replace(/[ \t]+/g, " ");
 
-  // Try strategies in order; use the first one that finds results
   let results = strategy1(normalised);
   if (results.length > 0) {
     console.log(`[import] Strategy 1 matched ${results.length} transactions`);
@@ -195,6 +277,12 @@ function parsePhonePeText(text: string): ParsedTx[] {
   results = strategy2(normalised);
   if (results.length > 0) {
     console.log(`[import] Strategy 2 matched ${results.length} transactions`);
+    return dedup(results);
+  }
+
+  results = strategy4(normalised);
+  if (results.length > 0) {
+    console.log(`[import] Strategy 4 matched ${results.length} transactions`);
     return dedup(results);
   }
 
@@ -212,14 +300,12 @@ router.post("/import/phonepe/preview", upload.single("pdf"), async (req, res) =>
 
     const data = await pdfParse(req.file.buffer);
 
-    // Log first 1000 chars of extracted text for debugging
     console.log("[import] PDF text sample (first 1000 chars):\n", data.text.slice(0, 1000));
     console.log("[import] Total text length:", data.text.length);
 
     const parsed = parsePhonePeText(data.text);
 
     if (parsed.length === 0) {
-      // Return the raw text sample in the error so we can debug further
       const sample = data.text.slice(0, 500).replace(/\n/g, " | ");
       return res.status(422).json({
         error: "No transactions found. Make sure you uploaded a PhonePe statement PDF.",
@@ -275,21 +361,37 @@ router.post("/import/phonepe/confirm", async (req, res) => {
       return res.status(400).json({ error: "No transactions provided" });
     }
 
-    const inserted = await db
-      .insert(transactionsTable)
-      .values(
-        transactions.map((tx) => ({
-          amount: String(tx.amount),
-          type: tx.type,
-          description: tx.description,
-          date: tx.date,
-          categoryId: tx.categoryId ?? null,
-        }))
-      )
-      .returning({ id: transactionsTable.id });
+    // Validate each row before attempting inserts
+    const rows = transactions
+      .filter((tx) => tx.date && tx.description?.trim() && tx.type && tx.amount > 0)
+      .map((tx) => ({
+        amount: String(tx.amount),
+        type: tx.type,
+        description: tx.description.trim(),
+        date: tx.date,
+        categoryId: tx.categoryId ?? null,
+      }));
 
-    return res.json({ imported: inserted.length });
+    if (rows.length === 0) {
+      return res.status(400).json({ error: "No valid transactions to import" });
+    }
+
+    // Batch inserts in chunks of 100 to avoid hitting PostgreSQL parameter limits
+    const CHUNK_SIZE = 100;
+    let totalInserted = 0;
+
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const inserted = await db
+        .insert(transactionsTable)
+        .values(chunk)
+        .returning({ id: transactionsTable.id });
+      totalInserted += inserted.length;
+    }
+
+    return res.json({ imported: totalInserted });
   } catch (err: any) {
+    console.error("[import] confirm error:", err);
     return res.status(500).json({ error: err.message || "Failed to import transactions" });
   }
 });
