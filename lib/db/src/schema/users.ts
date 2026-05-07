@@ -6,6 +6,7 @@ export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
   mobile: text("mobile").notNull().unique(),
   name: text("name").notNull(),
+  passwordHash: text("password_hash").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
