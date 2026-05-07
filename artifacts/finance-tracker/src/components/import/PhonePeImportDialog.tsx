@@ -4,6 +4,7 @@ import { Upload, FileText, CheckCircle2, XCircle, Loader2, X, IndianRupee, Arrow
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/hooks/use-user";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -34,6 +35,7 @@ export default function PhonePeImportDialog({ open, onOpenChange }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useUser();
 
   const reset = () => {
     setStep("upload");
@@ -60,6 +62,7 @@ export default function PhonePeImportDialog({ open, onOpenChange }: Props) {
       formData.append("pdf", file);
       const res = await fetch(`${API_BASE}/api/import/phonepe/preview`, {
         method: "POST",
+        headers: user ? { "x-user-id": String(user.id) } : {},
         body: formData,
       });
       const data = await res.json();
@@ -101,7 +104,10 @@ export default function PhonePeImportDialog({ open, onOpenChange }: Props) {
     try {
       const res = await fetch(`${API_BASE}/api/import/phonepe/confirm`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user ? { "x-user-id": String(user.id) } : {}),
+        },
         body: JSON.stringify({ transactions: selected.map(({ selected: _, ...tx }) => tx) }),
       });
       const data = await res.json();
